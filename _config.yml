@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Welcome to Jekyll!
 #
 # This config file is meant for settings that affect your whole blog, values
@@ -45,3 +46,6 @@ exclude:
 sass:
   style: compressed
 future: true
+=======
+theme: jekyll-theme-slate
+>>>>>>> 6fcaa3ddee13b283f54b998e1bb0ffacfa02de31
