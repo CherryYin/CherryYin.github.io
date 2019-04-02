@@ -1,15 +1,10 @@
 ---
 layout: default
+css: ["page.css"]
 ---
-<article class="post">
-
-  <header class="post-header">
-    <h2 class="post-title">{{ page.title }}</h2>
-    <hr>
-  </header>
-
-  <div class="post-content">
+<div id="page-info">
+    <h3>{{page.title}}</h3>
+</div>
+<div class="row">
     {{ content }}
-  </div>
-
-</article>
+</div>
