@@ -1,11 +1,7 @@
 ---
 layout: page
-title: About
-permalink: /about/
+title: "About Me"
+css: ["about.css", "animate.css", "morphext.css"]
+js: ["morphext.min.js", "about.js"]
 ---
-
-Taken is a two column minimalist Jekyll theme.
-
-Taken is based on [chapter tumblr theme.](http://theme-chapter.tumblr.com/)
-
-You can fork taken from [here.](https://github.com/vfalanis/taken)
+{% include about.html %}
