@@ -5,7 +5,7 @@ var flagX = 0;
     flagY = 2;
 setInterval(function () {
     navBg.style.background = "linear-gradient(" + x +
-        "deg, ##FFE6FF 10%, #FF8EFF " + y + "%)";
+        "deg, #3AA17E 10%, #00537E " + y + "%)";
     if (flagX == 0) {
         x++;
         if (x == 360) {
