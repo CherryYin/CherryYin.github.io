@@ -1,6 +1,6 @@
 ---
 layout: page
-title: "Contact me"
+title: "联系我"
 css: ["contact.css"]
 ---
 {% include contact.html %}
