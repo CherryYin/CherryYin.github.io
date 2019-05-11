@@ -30,12 +30,15 @@ excerpt: HRL-RE——端到端训练实体和关系抽取
 
 ### **二. 高级别RL**
 首先，按时刻扫描文本，对于t时刻来说，输入Text(t),通过以Bilstm为隐含层，抽取t时刻文本特征，然后结合t-1时刻状态st-1, 前一次关系类型向量vt，做MLP，得到此刻状态
-![高级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/11.png)
+  
+  ![高级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/11.png)
 其中
-![高级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/15.png)
+  
+  ![高级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/15.png)
 隐含层提取出特征ht，结合高级别上一时间步t-1的状态St-1(h)、上一次的关系类型（action）vt，作为当前时间步t的输入，经过一个全连接矩阵运算，再通过tanh激活，转化为状态。
 bilstm隐含层程序：
-(```)
+  
+```
         prehid = autograd.Variable(torch.cuda.FloatTensor(self.dim, ).fill_(0))
         prec = autograd.Variable(torch.cuda.FloatTensor(self.dim, ).fill_(0))
         front, back = [0 for i in range(len(text))], [0 for i in range(len(text))]
@@ -50,16 +53,19 @@ bilstm隐含层程序：
         wordin = []
         for x in range(len(text)):
 		    wordin.append(torch.cat([front[x], back[x]]))
-(```)
+```
 
 隐含层转化到状态的转化成：
-`self.hid2state = nn.Linear(dim*3 + statedim, statedim)`
+  
+  `self.hid2state = nn.Linear(dim*3 + statedim, statedim)`
 
 加入了dropout:
-`outp = F.dropout(F.tanh(self.hid2state(inp)), training=training) `
+  
+  `outp = F.dropout(F.tanh(self.hid2state(inp)), training=training) `
 
 将状态通过softmax分类后，得到当前策略：
-![高级别策略](http://cherryyin.github.io/assets/picture/2019-04-10/18.png)
+  
+  ![高级别策略](http://cherryyin.github.io/assets/picture/2019-04-10/18.png)
 
 此块程序：
 `prob = F.softmax(self.state2prob(outp), dim=0)`
@@ -67,7 +73,7 @@ bilstm隐含层程序：
 这里选择softmax作为策略函数，主要是因为高级别关系抽取时R+1分类问题。从程序上来看，从状态转换到策略，除了softmax，也假如了一层全连接计算。
 策略计算完后，得到各关系类别的概率，接下来用一个采样过程，决定输出哪一个关系。
 从策略到关系分类的程序如下：
-(```)
+```
         action = self.sample(prob, training, preoptions, x)
             if action.data[0] != 0: 
                 rel_action = action
@@ -77,10 +83,10 @@ bilstm隐含层程序：
                 top_actprob.append(actprob.cpu().data[0])
             else:
                 top_actprob.append(actprob)
-(```)
+```
 采样过程有3个分支：如果是预测模式，选择概率最大的那个action作为预测动作；如果是训练模型，并且提供了与标注的action值，那么就将预标注action的概率作为预测概率；如果是训练模式，但没有预标注的动作，那么就对对各关系类别的概率进行多项式分布随机抽样，程序如下：
 sample程序：
-(```)
+```
     def sample(self, prob, training, preoptions, position):
         if not training:
             return torch.max(prob, 0)[1]
@@ -88,10 +94,10 @@ sample程序：
             return autograd.Variable(torch.cuda.LongTensor(1, ).fill_(preoptions[position]))
         else:
             return torch.multinomial(prob, 1)
-(```)
+```
 
 其中preoptions来自于
-(```)
+```
 def rule_actions(gold_labels):
     length = len(gold_labels[0]['tags'])
     options = [0 for i in range(length)]
@@ -116,33 +122,39 @@ def rule_actions(gold_labels):
                 options[pos] = tp
                 actions[pos] = tags
     return options, actions	
-(```)
+```
 
 前两种采样方式比较好理解，最后一个抽样，采用多项式分布随机抽样1次，抽取到的概率对应的关系类别作为预测动作，是不是太放飞自我，虽然概率大的更可能被抽到，然而随机抽样总觉得太随意了吧。
 
 以RNN的形式来看，将每个时刻的计算封装在一个cell中，那么，这个cell的结构是这样的：
-![高级别每个时间步运算](http://cherryyin.github.io/assets/picture/2019-04-10/78.png)
+  
+  ![高级别每个时间步运算](http://cherryyin.github.io/assets/picture/2019-04-10/78.png)
 
 ### **三. 低级别RL**
 低级别模块在原理上和高级别模块类似，都是以马尔科夫链的形式针对每个时刻计算。只是，针对单个文本，高级模块只需要判断文本中包含的关系类别，以及各类别最可能出现的时刻，这意味着高级别模块处理整个文本只需要遍历文本的隐含特征一次，每一次算作一个时刻，每个时刻都有可能触发一次低级别模块，而低级别模块被触发后需要完成该关系是由文本中哪两个实体产生的，这就意味着，每被触发一次，需要遍历一次文本，因为实体可能在文本的任何位置。总体来说，一个文本被高级别模块遍历一次，被低级别模块遍历N次，N为文本中实体关系数量。
-（贴遍历过程图）
 
 低级别模块分析
 一旦高级别模块的action确定为非0，低级别模块被触发，低级别模块针对文本的每个时刻计算状态、策略、奖励，每个时刻也类似于RNN中的一个cell。
 每个cell的外部输入和高级别模块的cell是一样的， 他们可以共用文本的bilstm输出特征。状态计算公式如下：
-![低级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/41.png)
+  
+  ![低级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/41.png)
 对应的程序：
 `self.hid2state = nn.Linear(dim*3 + statedim*2, statedim)`
 
 输入除了包含外部输入即隐含层输出ht、上一时刻状态St-1、上一时刻实体标记向量（策略做softmax前得向量）vt'，还增加了当前时间步上下文特征向量Ct'。从隐含特征转化为状态的方法完全一致。
 由于高级别输出的关系类别对实体的识别需要有帮助，毕竟确定关系后，源实体和目标实体的类别其实也算是确定了，所以，在状态转化到策略的过程中，要引入关系类别。
-![低级别策略](http://cherryyin.github.io/assets/picture/2019-04-10/50.png)
-这一块的程序：
+  
+  ![低级别策略](http://cherryyin.github.io/assets/picture/2019-04-10/50.png)
+  
+  这一块的程序：
+
 `prob = F.softmax(self.state2probL[rel-1](outp), dim=0)`
+
 其中
+
 `self.state2probL = nn.ModuleList([nn.Linear(statedim, 7) for i in range(0, rel_count)])`
 这里，Wπ是关系权重向量，这个向量的shape是（R+1，Ds, C+1），即每种关系都有一个不同的全连接权重，而全连接将状态矩阵转化为分类矩阵，因此由状态的维度转化为实体标注类别维度。从关系权重向量中把高级别输出的关系类型对应的类别找到，然后与St做全连接，再softmax分类，久可以得到当前时刻的token的被分为每个实体标注类别的概率了。当然计算完概率后依然是采样，采样过程也和高级别模块调用同一个sample方法。
-(```)
+```
 					actionb = self.sample(probb, training, preactions[x] if preactions is not None else None, y)
 					actprobb = probb[actionb]
                     actions.append(actionb.cpu().data[0])
@@ -150,7 +162,7 @@ def rule_actions(gold_labels):
                         actprobs.append(actprobb.cpu().data[0]) 
                     else:
                         actprobs.append(actprobb)
-(```)
+```
 
 以RNN的形式来看，每个时刻对应的计算cell的内部结构基本上和高级别一样。
 
@@ -160,9 +172,12 @@ def rule_actions(gold_labels):
 首先，高级别模块，优化目标是最大化整个文本在每个时间步上的奖励的累积奖励值。从前面的前向模型可以看到，每个时间步t得到的策略 µ，每一时间步根据策略会得到该步各种关系类型的概率分布，然后根据该步的真实关系概率做出的抉择来最大化主要任务的预期累积。
 #### 1. 高级别模块奖励和梯度
 论文中介绍的奖励计算方式：
-![高级别奖励](http://cherryyin.github.io/assets/picture/2019-04-10/21.png)
-比较容易理解，程序里貌似给的值稍微不一样。
-(```)
+  
+  ![高级别奖励](http://cherryyin.github.io/assets/picture/2019-04-10/21.png)
+  
+  比较容易理解，程序里貌似给的值稍微不一样。
+  
+```
 def calcTopReward(top_action, gold_labels):
     lenth = len(top_action)
     r = [0. for i in range(lenth)]
@@ -180,12 +195,13 @@ def calcTopReward(top_action, gold_labels):
                         ok = -0.2
             r[i] = ok
     return r
-(```)
+```
 
 整个文本最终的奖励：
-![高级别最终奖励](http://cherryyin.github.io/assets/picture/2019-04-10/26.png)
+  
+  ![高级别最终奖励](http://cherryyin.github.io/assets/picture/2019-04-10/26.png)
 
-(```)
+```
 def calcTopFinalReward(top_action, gold_labels, top_bias = 0.):
     r = 0.
     a1, t1, c1 = calc_acc(top_action, None, gold_labels, ["RE"])
@@ -197,18 +213,22 @@ def calcTopFinalReward(top_action, gold_labels, top_bias = 0.):
         r -= 0.5 * (c1 - t1)
     r *= len(top_action)
     return r - top_bias
-(```)
+```
 
 高级别目标函数：
-![高级别目标函数](http://cherryyin.github.io/assets/picture/2019-04-10/63.png)
-其中，γ是每个时间步的奖励的折扣因子，μ是高级别策略轨迹，r是单时间步的高级别奖励。
+  
+  ![高级别目标函数](http://cherryyin.github.io/assets/picture/2019-04-10/63.png)
+  
+  其中，γ是每个时间步的奖励的折扣因子，μ是高级别策略轨迹，r是单时间步的高级别奖励。
 
 高级别政策的梯度产生：
-![高级别梯度](http://cherryyin.github.io/assets/picture/2019-04-10/75.png)
+  
+  ![高级别梯度](http://cherryyin.github.io/assets/picture/2019-04-10/75.png)
 其中高级别梯度和低级别梯度的R计算如下：
-![高级别R计算](http://cherryyin.github.io/assets/picture/2019-04-10/69.png)
+  
+  ![高级别R计算](http://cherryyin.github.io/assets/picture/2019-04-10/69.png)
 
-(```)
+```
 def calcTopGrad(top_action, top_actprob, top_reward, top_final_reward, pretrain=False):
     lenth = len(top_action)
     decay_reward = top_final_reward 
@@ -222,15 +242,18 @@ def calcTopGrad(top_action, top_actprob, top_reward, top_final_reward, pretrain=
             to_grad *= 0.3
         grads = grads + to_grad
     return grads
-(```)
+```
 
 #### 2. 低级别模块的奖励和梯度
 每个时间步的奖励计算：
-![低级别奖励1](http://cherryyin.github.io/assets/picture/2019-04-10/56.png)
-![低级别奖励2](http://cherryyin.github.io/assets/picture/2019-04-10/61.png)
+  
+  ![低级别奖励1](http://cherryyin.github.io/assets/picture/2019-04-10/56.png)
+  
+  ![低级别奖励2](http://cherryyin.github.io/assets/picture/2019-04-10/61.png)
 
 较小的α导致对不是实体的单词奖励较少。以这种方式，该模型避免学习到最后出现所有单词预测为N（非实体单词）的简单策略。
-(```)
+
+```
 def calcBotReward(top_action, bot_action, gold_labels):
     lenth = len(top_action)
     r = [[0. for i in range(lenth)] for j in range(len(bot_action))]
@@ -249,10 +272,11 @@ def calcBotReward(top_action, bot_action, gold_labels):
                             r[j][t] = -0.5
             j += 1
     return r
-(```)
+```
 
 当对所有动作进行采样时，将计算额外的最终奖励。如果正确预测了所有实体标签，则最后收到+1奖励，否则为-1。
-(```)
+
+```
 def calcBotFinalReward(top_action, bot_action, gold_labels, bot_bias = 0.):
     lenth = len(top_action)
     r = [0. for j in range(len(bot_action))]
@@ -273,14 +297,16 @@ def calcBotFinalReward(top_action, bot_action, gold_labels, bot_bias = 0.):
     for j in range(len(bot_action)):
         r[j] -= bot_bias
     return r
-(```)
+```
 
 低级别模块的目标函数：
-![低级别模块目标函数](http://cherryyin.github.io/assets/picture/2019-04-10/67.png)
+  
+  ![低级别模块目标函数](http://cherryyin.github.io/assets/picture/2019-04-10/67.png)
 梯度计算：
-![低级别模块梯度](http://cherryyin.github.io/assets/picture/2019-04-10/76.png)
+  
+  ![低级别模块梯度](http://cherryyin.github.io/assets/picture/2019-04-10/76.png)
 
-(```)
+```
 def calcBotGrad(top_action, bot_action, bot_actprob, bot_reward, bot_final_reward, pretrain=False):
     lenth = len(top_action)
     bot_tot_reward = [0. for i in range(lenth)]
@@ -302,10 +328,11 @@ def calcBotGrad(top_action, bot_action, bot_actprob, bot_reward, bot_final_rewar
                 grads = grads + to_grad
             j += 1
     return bot_tot_reward, grads
-(```)
+```
 
 整个模型的优化流程：
-(```)
+
+```
 def optimize(model, top_action, top_actprob, bot_action, bot_actprob, gold_labels, mode, top_bias = 0., bot_bias = 0.):
     lenth = len(top_action)
     top_reward = calcTopReward(top_action, gold_labels)
@@ -349,7 +376,7 @@ def optimize_round(model, top_actions, top_actprobs, bot_actions, bot_actprobs, 
         loss += optimize(model, top_actions[i], top_actprobs[i], bot_actions[i], \
                 bot_actprobs[i], gold_labels, mode, top_bias, bot_bias)
     return loss / sample_round
-(```)
+```
 
 
 ### **五. 总结**
