@@ -33,8 +33,8 @@ excerpt: HRL-RE——端到端训练实体和关系抽取
 ### **二. 高级别RL**
 首先，按时刻扫描文本，对于t时刻来说，输入Text(t),通过以Bilstm为隐含层，抽取t时刻文本特征，然后结合t-1时刻状态st-1, 前一次关系类型向量vt，做MLP，得到此刻状态
   
-  ![高级别状态1](http://cherryyin.github.io/assets/picture/2019-04-10/11.png)
-  
+  ![高级别状态2](http://cherryyin.github.io/assets/picture/2019-04-10/11.png)
+   
 其中
   
   ![高级别状态2](http://cherryyin.github.io/assets/picture/2019-04-10/15.png)
@@ -155,7 +155,9 @@ def rule_actions(gold_labels):
   
   ![低级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/41.png)
 对应的程序：
-`self.hid2state = nn.Linear(dim*3 + statedim*2, statedim)`
+
+```self.hid2state = nn.Linear(dim*3 + statedim*2, statedim)
+```
 
 输入除了包含外部输入即隐含层输出ht、上一时刻状态St-1、上一时刻实体标记向量（策略做softmax前得向量）vt'，还增加了当前时间步上下文特征向量Ct'。从隐含特征转化为状态的方法完全一致。
 由于高级别输出的关系类别对实体的识别需要有帮助，毕竟确定关系后，源实体和目标实体的类别其实也算是确定了，所以，在状态转化到策略的过程中，要引入关系类别。
@@ -164,11 +166,16 @@ def rule_actions(gold_labels):
   
   这一块的程序：
 
-`prob = F.softmax(self.state2probL[rel-1](outp), dim=0)`
+```
+prob = F.softmax(self.state2probL[rel-1](outp), dim=0)
+```
 
 其中
 
-`self.state2probL = nn.ModuleList([nn.Linear(statedim, 7) for i in range(0, rel_count)])`
+```
+self.state2probL = nn.ModuleList([nn.Linear(statedim, 7) for i in range(0, rel_count)])
+```
+
 这里，Wπ是关系权重向量，这个向量的shape是（R+1，Ds, C+1），即每种关系都有一个不同的全连接权重，而全连接将状态矩阵转化为分类矩阵，因此由状态的维度转化为实体标注类别维度。从关系权重向量中把高级别输出的关系类型对应的类别找到，然后与St做全连接，再softmax分类，久可以得到当前时刻的token的被分为每个实体标注类别的概率了。当然计算完概率后依然是采样，采样过程也和高级别模块调用同一个sample方法。
 ```
 					actionb = self.sample(probb, training, preactions[x] if preactions is not None else None, y)
