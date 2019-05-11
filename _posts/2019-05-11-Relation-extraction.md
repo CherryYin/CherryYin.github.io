@@ -26,17 +26,18 @@ excerpt: HRL-RE——端到端训练实体和关系抽取
 
 值得注意的是，整个模型类似于半马尔科夫链，高级别RL的当前次状态是由上一时刻状态、上一次行动（是上一时刻可能不动，所以这里是上一次）和此刻输入共同决定的，低级别RL此刻可能完全不被触发，也可能被触发后状态由高级别RL的行动、自己上一次的状态、此刻输入决定。
 整个结构图如下：
- ![HRL总体结构](http://cherryyin.github.io/assets/picture/2019-04-10/1.png)
+  
+  ![HRL总体结构](http://cherryyin.github.io/assets/picture/2019-04-10/1.png)
 
 
 ### **二. 高级别RL**
 首先，按时刻扫描文本，对于t时刻来说，输入Text(t),通过以Bilstm为隐含层，抽取t时刻文本特征，然后结合t-1时刻状态st-1, 前一次关系类型向量vt，做MLP，得到此刻状态
   
-  ![高级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/11.png)
+  ![高级别状态1](http://cherryyin.github.io/assets/picture/2019-04-10/11.png)
   
 其中
   
-  ![高级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/15.png)
+  ![高级别状态2](http://cherryyin.github.io/assets/picture/2019-04-10/15.png)
   
 隐含层提取出特征ht，结合高级别上一时间步t-1的状态St-1(h)、上一次的关系类型（action）vt，作为当前时间步t的输入，经过一个全连接矩阵运算，再通过tanh激活，转化为状态。
 bilstm隐含层程序：
@@ -66,7 +67,9 @@ self.hid2state = nn.Linear(dim*3 + statedim, statedim)
 
 加入了dropout:
   
-  `outp = F.dropout(F.tanh(self.hid2state(inp)), training=training) `
+```
+outp = F.dropout(F.tanh(self.hid2state(inp)), training=training)
+```
 
 将状态通过softmax分类后，得到当前策略：
   
@@ -74,11 +77,15 @@ self.hid2state = nn.Linear(dim*3 + statedim, statedim)
 
 
 此块程序：
-`prob = F.softmax(self.state2prob(outp), dim=0)`
+
+```
+prob = F.softmax(self.state2prob(outp), dim=0)
+```
 
 这里选择softmax作为策略函数，主要是因为高级别关系抽取时R+1分类问题。从程序上来看，从状态转换到策略，除了softmax，也假如了一层全连接计算。
 策略计算完后，得到各关系类别的概率，接下来用一个采样过程，决定输出哪一个关系。
 从策略到关系分类的程序如下：
+
 ```
         action = self.sample(prob, training, preoptions, x)
             if action.data[0] != 0: 
@@ -90,8 +97,10 @@ self.hid2state = nn.Linear(dim*3 + statedim, statedim)
             else:
                 top_actprob.append(actprob)
 ```
+
 采样过程有3个分支：如果是预测模式，选择概率最大的那个action作为预测动作；如果是训练模型，并且提供了与标注的action值，那么就将预标注action的概率作为预测概率；如果是训练模式，但没有预标注的动作，那么就对对各关系类别的概率进行多项式分布随机抽样，程序如下：
 sample程序：
+
 ```
     def sample(self, prob, training, preoptions, position):
         if not training:
@@ -103,6 +112,7 @@ sample程序：
 ```
 
 其中preoptions来自于
+
 ```
 def rule_actions(gold_labels):
     length = len(gold_labels[0]['tags'])
