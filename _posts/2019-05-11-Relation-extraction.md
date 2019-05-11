@@ -336,6 +336,7 @@ def calcBotFinalReward(top_action, bot_action, gold_labels, bot_bias = 0.):
 低级别模块的目标函数：
   
   ![低级别模块目标函数](https://cherryyin.github.io/assets/picture/2019-04-10/67.png)
+  
 梯度计算：
   
   ![低级别模块梯度](https://cherryyin.github.io/assets/picture/2019-04-10/76.png)
