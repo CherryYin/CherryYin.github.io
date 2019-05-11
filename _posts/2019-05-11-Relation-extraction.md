@@ -6,7 +6,6 @@ tags: 强化学习 关系抽取 实体识别 端到端训练
 excerpt: HRL-RE——端到端训练实体和关系抽取
 ---
 
-
   
    本文是对《A Hierarchical Framework for Relation Extraction with Reinforcement Learning》这项工作的理解和分析。很久没有深入分析一篇论文了，这篇算是笔者今年第一篇深入分析的工作，为什么要深入分析呢？大概是因为它可以一次搞定实体识别和关系分类，同时又采用了比较时髦的强化学习。
   论文作者友好的提供了pytorch下的代码。因此，笔者在看论文时，以论文分析为主线，对于重要的模块分析了对应的代码。
@@ -17,27 +16,28 @@ excerpt: HRL-RE——端到端训练实体和关系抽取
 该项工作的方案：作者们认为，实体识别和关系分类是相辅相成的，将两者融合在一个模型中，让关系引导实体识别，实体监督关系分类，一起训练效果更优。因此，作者提出的方法：对同一个文本，在一个模型中，通过两级半级联的强化学习（RL）来实现整个信息抽取，高级别的RL抽取关系，低级别RL识别实体，在整个文本的两级工作完成后计算奖励和梯度，整个模型同时优化。
 具体方法：
   
-    1. 通过一个按时刻工作的扫描器逐步扫描文本；
-	2. 每个时刻，扫描到当前文字后计算当前高级别RL的状态；
-	3. 根据当前高级别RL的状态选择策略，由策略决定当前时刻行动，当然这里的行动是虚拟的，相当于一共有R种方向可走，或者完全不动这R+1种选择；
-	4. 如果行动是完全不动，说明扫描到当前时刻还没有发现关系，那么继续下一时刻的扫描和计算；
-	5. 如果当前行动为前R个方向之一，那么触发低级别RL，即实体识别，同样计算当前时刻低级别RL的状态、策略、行动，低级别计算完后，继续下一步扫描和计算，直到整个文本扫描结束。
+  1. 通过一个按时刻工作的扫描器逐步扫描文本；	
+  2. 每个时刻，扫描到当前文字后计算当前高级别RL的状态；
+  3. 根据当前高级别RL的状态选择策略，由策略决定当前时刻行动，当然这里的行动是虚拟的，相当于一共有R种方向可走，或者完全不动这R+1种选择；
+  4. 如果行动是完全不动，说明扫描到当前时刻还没有发现关系，那么继续下一时刻的扫描和计算；
+  5. 如果当前行动为前R个方向之一，那么触发低级别RL，即实体识别，同样计算当前时刻低级别RL的状态、策略、行动，低级别计算完后，继续下一步扫描和计算，直到整个文本扫描结束。
 
 
 值得注意的是，整个模型类似于半马尔科夫链，高级别RL的当前次状态是由上一时刻状态、上一次行动（是上一时刻可能不动，所以这里是上一次）和此刻输入共同决定的，低级别RL此刻可能完全不被触发，也可能被触发后状态由高级别RL的行动、自己上一次的状态、此刻输入决定。
 整个结构图如下：
   
-  ![HRL总体结构](http://cherryyin.github.io/assets/picture/2019-04-10/1.png)
+  ![HRL总体结构](https://cherryyin.github.io/assets/picture/2019-04-10/1.png)
 
 
 ### **二. 高级别RL**
+
 首先，按时刻扫描文本，对于t时刻来说，输入Text(t),通过以Bilstm为隐含层，抽取t时刻文本特征，然后结合t-1时刻状态st-1, 前一次关系类型向量vt，做MLP，得到此刻状态
   
-  ![高级别状态2](http://cherryyin.github.io/assets/picture/2019-04-10/11.png)
+  ![高级别状态2](https://cherryyin.github.io/assets/picture/2019-04-10/11.png)
    
 其中
   
-  ![高级别状态2](http://cherryyin.github.io/assets/picture/2019-04-10/15.png)
+  ![高级别状态2](https://cherryyin.github.io/assets/picture/2019-04-10/15.png)
   
 隐含层提取出特征ht，结合高级别上一时间步t-1的状态St-1(h)、上一次的关系类型（action）vt，作为当前时间步t的输入，经过一个全连接矩阵运算，再通过tanh激活，转化为状态。
 bilstm隐含层程序：
@@ -73,7 +73,7 @@ outp = F.dropout(F.tanh(self.hid2state(inp)), training=training)
 
 将状态通过softmax分类后，得到当前策略：
   
-  ![高级别策略](http://cherryyin.github.io/assets/picture/2019-04-10/18.png)
+  ![高级别策略](https://cherryyin.github.io/assets/picture/2019-04-10/18.png)
 
 
 此块程序：
@@ -144,7 +144,7 @@ def rule_actions(gold_labels):
 
 以RNN的形式来看，将每个时刻的计算封装在一个cell中，那么，这个cell的结构是这样的：
   
-  ![高级别每个时间步运算](http://cherryyin.github.io/assets/picture/2019-04-10/78.png)
+  ![高级别每个时间步运算](https://cherryyin.github.io/assets/picture/2019-04-10/78.png)
 
 ### **三. 低级别RL**
 
@@ -153,20 +153,20 @@ def rule_actions(gold_labels):
 一旦高级别模块的action确定为非0，低级别模块被触发，低级别模块针对文本的每个时刻计算状态、策略、奖励，每个时刻也类似于RNN中的一个cell。
 每个cell的外部输入和高级别模块的cell是一样的， 他们可以共用文本的bilstm输出特征。状态计算公式如下：
   
-  ![低级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/41.png)
+  ![低级别状态](https://cherryyin.github.io/assets/picture/2019-04-10/41.png)
   
   
 对应的程序：
 
-
-```self.hid2state = nn.Linear(dim*3 + statedim*2, statedim)
+```
+self.hid2state = nn.Linear(dim*3 + statedim*2, statedim)
 ```
 
 
 输入除了包含外部输入即隐含层输出ht、上一时刻状态St-1、上一时刻实体标记向量（策略做softmax前得向量）vt'，还增加了当前时间步上下文特征向量Ct'。从隐含特征转化为状态的方法完全一致。
 由于高级别输出的关系类别对实体的识别需要有帮助，毕竟确定关系后，源实体和目标实体的类别其实也算是确定了，所以，在状态转化到策略的过程中，要引入关系类别。
   
-  ![低级别策略](http://cherryyin.github.io/assets/picture/2019-04-10/50.png)
+  ![低级别策略](https://cherryyin.github.io/assets/picture/2019-04-10/50.png)
   
   这一块的程序：
 
@@ -203,7 +203,7 @@ self.state2probL = nn.ModuleList([nn.Linear(statedim, 7) for i in range(0, rel_c
 #### 1. 高级别模块奖励和梯度
 论文中介绍的奖励计算方式：
   
-  ![高级别奖励](http://cherryyin.github.io/assets/picture/2019-04-10/21.png)
+  ![高级别奖励](https://cherryyin.github.io/assets/picture/2019-04-10/21.png)
   
   比较容易理解，程序里貌似给的值稍微不一样。
   
@@ -229,7 +229,7 @@ def calcTopReward(top_action, gold_labels):
 
 整个文本最终的奖励：
   
-  ![高级别最终奖励](http://cherryyin.github.io/assets/picture/2019-04-10/26.png)
+  ![高级别最终奖励](https://cherryyin.github.io/assets/picture/2019-04-10/26.png)
 
 ```
 def calcTopFinalReward(top_action, gold_labels, top_bias = 0.):
@@ -247,17 +247,17 @@ def calcTopFinalReward(top_action, gold_labels, top_bias = 0.):
 
 高级别目标函数：
   
-  ![高级别目标函数](http://cherryyin.github.io/assets/picture/2019-04-10/63.png)
+  ![高级别目标函数](https://cherryyin.github.io/assets/picture/2019-04-10/63.png)
   
   其中，γ是每个时间步的奖励的折扣因子，μ是高级别策略轨迹，r是单时间步的高级别奖励。
 
 高级别政策的梯度产生：
   
-  ![高级别梯度](http://cherryyin.github.io/assets/picture/2019-04-10/75.png)
+  ![高级别梯度](https://cherryyin.github.io/assets/picture/2019-04-10/75.png)
   
 其中高级别梯度和低级别梯度的R计算如下：
   
-  ![高级别R计算](http://cherryyin.github.io/assets/picture/2019-04-10/69.png)
+  ![高级别R计算](https://cherryyin.github.io/assets/picture/2019-04-10/69.png)
 
 
 ```
@@ -279,10 +279,10 @@ def calcTopGrad(top_action, top_actprob, top_reward, top_final_reward, pretrain=
 #### 2. 低级别模块的奖励和梯度
 每个时间步的奖励计算：
   
-  ![低级别奖励1](http://cherryyin.github.io/assets/picture/2019-04-10/56.png)
+  ![低级别奖励1](https://cherryyin.github.io/assets/picture/2019-04-10/56.png)
   
  
-  ![低级别奖励2](http://cherryyin.github.io/assets/picture/2019-04-10/61.png)
+  ![低级别奖励2](https://cherryyin.github.io/assets/picture/2019-04-10/61.png)
 
 
 较小的α导致对不是实体的单词奖励较少。以这种方式，该模型避免学习到最后出现所有单词预测为N（非实体单词）的简单策略。
@@ -335,10 +335,10 @@ def calcBotFinalReward(top_action, bot_action, gold_labels, bot_bias = 0.):
 
 低级别模块的目标函数：
   
-  ![低级别模块目标函数](http://cherryyin.github.io/assets/picture/2019-04-10/67.png)
+  ![低级别模块目标函数](https://cherryyin.github.io/assets/picture/2019-04-10/67.png)
 梯度计算：
   
-  ![低级别模块梯度](http://cherryyin.github.io/assets/picture/2019-04-10/76.png)
+  ![低级别模块梯度](https://cherryyin.github.io/assets/picture/2019-04-10/76.png)
 
 ```
 def calcBotGrad(top_action, bot_action, bot_actprob, bot_reward, bot_final_reward, pretrain=False):

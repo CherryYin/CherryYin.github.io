@@ -45,7 +45,7 @@ excerpt: “诊断（疾病）预测”论文笔记
 
 
   **结果**：
-  ![google深度学习预测结果](http://cherryyin.github.io/assets/picture/2019-04-09_4.png)
+  ![google深度学习预测结果](https://cherryyin.github.io/assets/picture/2019-04-09_4.png)
 
 
   备注：A. Jeff Dean 带领AI界、医学界大牛，在2018年，用以上三个算法做出来的工作；B. 数据来自两家医院，共10多万病人；C.	计算设备时间开销积为20万GPU时。D.	由于对数据的前期处理仅做了时序化映射，文本的个性特点依然保留，做出来的模型对其他数据泛化能力不一定强。
@@ -61,10 +61,10 @@ excerpt: “诊断（疾病）预测”论文笔记
   **目标**：基于电子病历做ICD诊断预测
 
   **方法**：将手上的电子病历分为大小两份，小的一份作为“支持集”，个人理解，相当于编码器的参考集合，大的一份用于训练。训练目标为预测诊断编码，同时用类KNN的方式找到“支持集合”中与输入病历最接近的“参考病历”，计算各预测诊断和参考病历各诊断的相似度。
-  ![半监督结果](http://cherryyin.github.io/assets/picture/2019-04-09_1.png)
+  ![半监督结果](https://cherryyin.github.io/assets/picture/2019-04-09_1.png)
 
   **结果**：
-  ![半监督结果](http://cherryyin.github.io/assets/picture/2019-04-09_2.png)
+  ![半监督结果](https://cherryyin.github.io/assets/picture/2019-04-09_2.png)
 
   **备注**：最近刚接触“匹配网络”这个字眼，还不熟，也不知道此匹配网络是否为其他论文提到的匹配网络，有必要了解一下。
 
