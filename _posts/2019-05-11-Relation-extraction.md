@@ -28,13 +28,16 @@ excerpt: HRL-RE——端到端训练实体和关系抽取
 整个结构图如下：
  ![HRL总体结构](http://cherryyin.github.io/assets/picture/2019-04-10/1.png)
 
+
 ### **二. 高级别RL**
 首先，按时刻扫描文本，对于t时刻来说，输入Text(t),通过以Bilstm为隐含层，抽取t时刻文本特征，然后结合t-1时刻状态st-1, 前一次关系类型向量vt，做MLP，得到此刻状态
   
   ![高级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/11.png)
+  
 其中
   
   ![高级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/15.png)
+  
 隐含层提取出特征ht，结合高级别上一时间步t-1的状态St-1(h)、上一次的关系类型（action）vt，作为当前时间步t的输入，经过一个全连接矩阵运算，再通过tanh激活，转化为状态。
 bilstm隐含层程序：
   
@@ -56,8 +59,10 @@ bilstm隐含层程序：
 ```
 
 隐含层转化到状态的转化成：
-  
-  `self.hid2state = nn.Linear(dim*3 + statedim, statedim)`
+
+```
+self.hid2state = nn.Linear(dim*3 + statedim, statedim)
+```
 
 加入了dropout:
   
@@ -66,6 +71,7 @@ bilstm隐含层程序：
 将状态通过softmax分类后，得到当前策略：
   
   ![高级别策略](http://cherryyin.github.io/assets/picture/2019-04-10/18.png)
+
 
 此块程序：
 `prob = F.softmax(self.state2prob(outp), dim=0)`
@@ -381,9 +387,9 @@ def optimize_round(model, top_actions, top_actprobs, bot_actions, bot_actprobs, 
 
 ### **五. 总结**
     
-	从论文到程序还是看了蛮久的，尤其是程序，作者在github上提供的源代码是pytorch的，而笔者从没用过pytorch，一开始，原本打算自己按照流程写tensorflow的程序，但仔细研究了论文后，发现tensorflow写这个程序还真是比较麻烦。
-	由于对单个文本的计算实际上包含了两个按时间步为单位的循环计算块，其中一个是bilstm，直接调用现有layer没问题，然而，后一个循环计算需要自己编码cell然后套入到RNN中，其中最难搞定的就是dropout。tensorflow建图是静态的，不太利于这种循环建图，而pytorch是动态建图，做这种循环就很方便。但是，这个循环在GPU上跑真的很慢，不知道是不是笔者参数调的不好。
-	总的来说，尝试了一次端到端的信息抽取，还是不错的。
-------
+从论文到程序还是看了蛮久的，尤其是程序，作者在github上提供的源代码是pytorch的，而笔者从没用过pytorch，一开始，原本打算自己按照流程写tensorflow的程序，但仔细研究了论文后，发现tensorflow写这个程序还真是比较麻烦。
+由于对单个文本的计算实际上包含了两个按时间步为单位的循环计算块，其中一个是bilstm，直接调用现有layer没问题，然而，后一个循环计算需要自己编码cell然后套入到RNN中，其中最难搞定的就是dropout。tensorflow建图是静态的，不太利于这种循环建图，而pytorch是动态建图，做这种循环就很方便。但是，这个循环在GPU上跑真的很慢，不知道是不是笔者参数调的不好。
+总的来说，尝试了一次端到端的信息抽取，还是不错的。
+
 
 ###  **返回[顶部](#home)**
