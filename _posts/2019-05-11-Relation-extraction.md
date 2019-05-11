@@ -147,17 +147,21 @@ def rule_actions(gold_labels):
   ![高级别每个时间步运算](http://cherryyin.github.io/assets/picture/2019-04-10/78.png)
 
 ### **三. 低级别RL**
+
 低级别模块在原理上和高级别模块类似，都是以马尔科夫链的形式针对每个时刻计算。只是，针对单个文本，高级模块只需要判断文本中包含的关系类别，以及各类别最可能出现的时刻，这意味着高级别模块处理整个文本只需要遍历文本的隐含特征一次，每一次算作一个时刻，每个时刻都有可能触发一次低级别模块，而低级别模块被触发后需要完成该关系是由文本中哪两个实体产生的，这就意味着，每被触发一次，需要遍历一次文本，因为实体可能在文本的任何位置。总体来说，一个文本被高级别模块遍历一次，被低级别模块遍历N次，N为文本中实体关系数量。
 
-低级别模块分析
 一旦高级别模块的action确定为非0，低级别模块被触发，低级别模块针对文本的每个时刻计算状态、策略、奖励，每个时刻也类似于RNN中的一个cell。
 每个cell的外部输入和高级别模块的cell是一样的， 他们可以共用文本的bilstm输出特征。状态计算公式如下：
   
   ![低级别状态](http://cherryyin.github.io/assets/picture/2019-04-10/41.png)
+  
+  
 对应的程序：
+
 
 ```self.hid2state = nn.Linear(dim*3 + statedim*2, statedim)
 ```
+
 
 输入除了包含外部输入即隐含层输出ht、上一时刻状态St-1、上一时刻实体标记向量（策略做softmax前得向量）vt'，还增加了当前时间步上下文特征向量Ct'。从隐含特征转化为状态的方法完全一致。
 由于高级别输出的关系类别对实体的识别需要有帮助，毕竟确定关系后，源实体和目标实体的类别其实也算是确定了，所以，在状态转化到策略的过程中，要引入关系类别。
@@ -166,9 +170,11 @@ def rule_actions(gold_labels):
   
   这一块的程序：
 
+
 ```
 prob = F.softmax(self.state2probL[rel-1](outp), dim=0)
 ```
+
 
 其中
 
@@ -177,6 +183,7 @@ self.state2probL = nn.ModuleList([nn.Linear(statedim, 7) for i in range(0, rel_c
 ```
 
 这里，Wπ是关系权重向量，这个向量的shape是（R+1，Ds, C+1），即每种关系都有一个不同的全连接权重，而全连接将状态矩阵转化为分类矩阵，因此由状态的维度转化为实体标注类别维度。从关系权重向量中把高级别输出的关系类型对应的类别找到，然后与St做全连接，再softmax分类，久可以得到当前时刻的token的被分为每个实体标注类别的概率了。当然计算完概率后依然是采样，采样过程也和高级别模块调用同一个sample方法。
+
 ```
 					actionb = self.sample(probb, training, preactions[x] if preactions is not None else None, y)
 					actprobb = probb[actionb]
@@ -247,9 +254,11 @@ def calcTopFinalReward(top_action, gold_labels, top_bias = 0.):
 高级别政策的梯度产生：
   
   ![高级别梯度](http://cherryyin.github.io/assets/picture/2019-04-10/75.png)
+  
 其中高级别梯度和低级别梯度的R计算如下：
   
   ![高级别R计算](http://cherryyin.github.io/assets/picture/2019-04-10/69.png)
+
 
 ```
 def calcTopGrad(top_action, top_actprob, top_reward, top_final_reward, pretrain=False):
@@ -272,7 +281,9 @@ def calcTopGrad(top_action, top_actprob, top_reward, top_final_reward, pretrain=
   
   ![低级别奖励1](http://cherryyin.github.io/assets/picture/2019-04-10/56.png)
   
+ 
   ![低级别奖励2](http://cherryyin.github.io/assets/picture/2019-04-10/61.png)
+
 
 较小的α导致对不是实体的单词奖励较少。以这种方式，该模型避免学习到最后出现所有单词预测为N（非实体单词）的简单策略。
 
